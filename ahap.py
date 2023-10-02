@@ -234,13 +234,13 @@ class AHAP:
             f.write(json.dumps(self.data, **kwargs))
 
 
-def freq(n: int) -> float:
+def freq(n: int, normalize: bool=True) -> float:
     """
     calculates the haptic sharpness value from frequency in hz.
 
     Args:
         n (int): The input frequency value.
-
+        normalize (bool): if normalizing, all high frequencies will be 230 and all low will be 80 if value is too high or too low.
     Returns:
         float: The normalized frequency value between 0 and 1.
 
@@ -248,8 +248,10 @@ def freq(n: int) -> float:
         ValueError: If the input frequency is less than 80 or greater than 230.
         ValueError: If the calculated normalized frequency is less than 0 or greater than 1.
     """
+    if normalize and n>230: n=230
+    if normalize and n<80: n=80
     if n < 80 or n > 230:
-        raise ValueError("Incorrect frequency. Frequency must be between 80 and 230.")
+        raise ValueError(f"Incorrect frequency. Frequency must be between 80 and 230, but it is {n}")
     r = (math.log(n) - math.log(80)) / (math.log(230) - math.log(80))
     if r < 0 or r > 1:
         raise ValueError("The calculated normalized frequency is out of range. Result must be between 0 and 1.")
