@@ -1,5 +1,6 @@
 from enum import Enum
 import datetime
+import math
 import os
 import json
 from typing import List
@@ -249,7 +250,7 @@ def freq(n: int) -> float:
     """
     if n < 80 or n > 230:
         raise ValueError("Incorrect frequency. Frequency must be between 80 and 230.")
-    r = (n - 80) / (230 - 80)
+    r = (math.log(n) - math.log(80)) / (math.log(230) - math.log(80))
     if r < 0 or r > 1:
         raise ValueError("The calculated normalized frequency is out of range. Result must be between 0 and 1.")
     return r
