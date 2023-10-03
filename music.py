@@ -21,15 +21,15 @@ ahap = AHAP(f"midi file {filename}", "midi to haptic generator")
 note_state = {}  # Dictionary to track note states (on/off)
 for msg in midi_file:
     time += msg.time
-    if msg.is_meta: continue
-    if msg.type == 'note_on':
+    if msg.is_meta and hasattr(msg, "note"): continue
+    if msg.type == 'note_on' and msg.velocity>0:
         note_state[msg.note] = time
-    elif msg.type == 'note_off':
+    elif msg.type == 'note_off' or (msg.type=='note_on' and msg.velocity==0):  # musescore doesn't do note_off, it does note on with velocity 0.
         if msg.note not in note_state:
             print(f"Warning: Found note_off message without a corresponding note_on for note {msg.note}")
         else:
             duration = time - note_state[msg.note]
-            # print(duration)
+            #print(duration)
             # Add a haptic event for the note
             ahap.add_haptic_continuous_event(note_state[msg.note], duration, 1.0, freq(note(msg.note)))
 
