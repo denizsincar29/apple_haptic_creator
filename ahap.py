@@ -56,18 +56,6 @@ class CurveParamID(Enum):
     A_DecayTime = "AudioDecayTimeControl"
     A_ReleaseTime = "AudioReleaseTimeControl"
 
-def create_curve(start_time: float, end_time: float, start_value: float, end_value: float, total=10):
-    timediff=end_time-start_time
-    valuediff=end_value-start_value
-    timestep=timediff/total
-    valuestep=valuediff/total
-    curvelist=[]
-    for i in range(total):
-        curvelist.append(HapticCurve(start_time+timestep*(i+1), start_value+valuestep*(i+1)))
-    #print("start time", start_time, "endtime", end_time)
-    return curvelist
-
-
 class ParamID(Enum):
     H_Intensity = "HapticIntensity"
     H_Sharpness = "HapticSharpness"
@@ -81,6 +69,17 @@ class ParamID(Enum):
     A_AttackTime = "AudioAttackTime"
     A_DecayTime = "AudioDecayTime"
     A_ReleaseTime = "AudioReleaseTime"
+
+def create_curve(start_time: float, end_time: float, start_value: float, end_value: float, total=10):
+    timediff=end_time-start_time
+    valuediff=end_value-start_value
+    timestep=timediff/total
+    valuestep=valuediff/total
+    curvelist=[]
+    for i in range(total):
+        curvelist.append(HapticCurve(start_time+timestep*(i+1), start_value+valuestep*(i+1)))
+    #print("start time", start_time, "endtime", end_time)
+    return curvelist
 
 
 class AHAP:

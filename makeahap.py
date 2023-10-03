@@ -12,7 +12,7 @@ for i in range(7):
     time+=0.05
 ahap.add_haptic_continuous_event(time, 15.0, 0.75, 0.0)
 for i in range(300):
-ahap.add_haptic_transient_event(time+i*0.05 , 1.0, 1.0)
+    ahap.add_haptic_transient_event(time+i*0.05 , 1.0, 1.0)
 ahap.add_parameter_curve(CurveParamID.H_Sharpness, time, create_curve(0.0, 0.4, 0.0, 0.75, 10))
 time+=0.4
 ahap.add_parameter_curve(CurveParamID.H_Sharpness, time, create_curve(0.0, 0.8, 0.75, 0.2))
