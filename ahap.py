@@ -3,9 +3,10 @@ import datetime
 import math
 import os
 import json
-from typing import List
+from typing import Any, List, Tuple
 
 class HapticCurve:
+    """Represents the haptic curve"""
     def __init__(self, time: float, parameter_value: float):
         """
         Initialize a HapticCurve object.
@@ -28,6 +29,8 @@ class HapticCurve:
         data = {"Time": self.time, "ParameterValue": self.parameter_value}
         return data
 
+    def __call__(self, *args: Any, **kwds: Any) -> Any:
+        return self.get_data()
     def __repr__(self): return repr(self.get_data())
 
 def curves(c: List[HapticCurve]) -> List[dict]:
@@ -70,6 +73,7 @@ class ParamID(Enum):
     A_DecayTime = "AudioDecayTime"
     A_ReleaseTime = "AudioReleaseTime"
 
+# soon we will do it a @classmethod, but it'll break compatibility so i'm lazy!
 def create_curve(start_time: float, end_time: float, start_value: float, end_value: float, total=10):
     timediff=end_time-start_time
     valuediff=end_value-start_value
@@ -83,6 +87,7 @@ def create_curve(start_time: float, end_time: float, start_value: float, end_val
 
 
 class AHAP:
+    """_Class that allows to make Apple haptic signal files (.ahap)."""
     def __init__(self, description: str = "test AHAP file", created_by: str = "Deniz Sincar"):
         """
         Initialize an AHAP object.
@@ -124,6 +129,9 @@ class AHAP:
         if event_waveform_path is not None:
             pattern["Event"]["EventWaveformPath"] = event_waveform_path
         self.data["Pattern"].append(pattern)
+
+    def __rshift__(self, args: Tuple):
+        self.add_event(*args)
 
     def add_haptic_transient_event(self, time: float, haptic_intensity: float = 0.5, haptic_sharpness: float = 0.5):
         """
@@ -214,11 +222,11 @@ class AHAP:
 
         self.data["Pattern"].append(pattern)
 
-    def print_data(self):
+    def __repr__(self):
         """
         Print the data of the AHAP object.
         """
-        print(self.data)
+        repr(self.data)
 
     def export(self, filename: str, path: str = ".", **kwargs):
         """
@@ -232,6 +240,25 @@ class AHAP:
         with open(os.path.join(path, filename), 'w') as f:
             f.write(json.dumps(self.data, **kwargs))
 
+    def __call__(self, *args: Any, **kwds: Any) -> Any:
+        self.export(*args, **kwds)
+
+    def __add__(self, other: AHAP):
+        """adds 2 ahap files. Attension, it smooshes them one on another, it doesn't work as expected now. Please don't use this method if you don't want to really smoosh them.
+
+        Args:
+            other (AHAP): another Ahap class.
+        """
+        data = {
+            "Version": 1.0,
+            "Metadata": {
+                "Project": "Basis",
+                "Created": str(datetime.datetime.now()),
+                "Description": self.data["Metadata"]["Description"],
+                "Created By": self.data["Metadata"]["Created By"]
+            },
+            "Pattern": self.data["Pattern"]+other.data["Pattern"]
+        }
 
 def freq(n: int, normalize: bool=True) -> float:
     """
