@@ -24,19 +24,38 @@ Define your settings and haptic sounds:
 bpm = 120
 time = 4/4
 
-# Haptic definitions
-# Format: letter = name, intensity, sharpness [, curve_direction, duration_ms]
-s = snare, 1.0, 0.9, down, 60
-k = kick, 1.0, 0.2
-h = hihat, 0.6, 1.0
+# Haptic definitions - Two syntax formats supported:
+
+# NEW SYNTAX (recommended):
+# letter=name: type; parameter=value, parameter=value; ...
+k=kick: continuous; intensity=0.9, sharpness_curve=0.5-0.2; duration=0.1
+s=snare: transient; intensity=1.0, sharpness_curve=0.9-0.3; curve_duration=0.06
+h=hihat: transient; intensity=0.6, sharpness=1.0
+
+# OLD SYNTAX (still supported):
+# letter = name, intensity, sharpness [, curve_direction, duration_ms]
+# s = snare, 1.0, 0.9, down, 60
+# k = kick, 1.0, 0.2
 ```
 
-**Haptic Definition Format:**
+**New Haptic Definition Format (Recommended):**
+
+Format: `letter=name: type; parameter=value, parameter=value; ...`
+
 - `letter`: Single letter (a-z) that will trigger this haptic
 - `name`: Descriptive name (for documentation)
-- `intensity`: Haptic intensity (0.0 to 1.0)
-- `sharpness`: Haptic sharpness (0.0 to 1.0)
-- `curve_direction` (optional): "up" or "down" - direction of sharpness curve
+- `type`: "transient" (sharp tap) or "continuous" (sustained vibration)
+
+**Parameters (all optional with defaults):**
+- `intensity`: Haptic intensity (0.0 to 1.0, default: 0.8)
+- `sharpness`: Haptic sharpness (0.0 to 1.0, default: 0.5)
+- `sharpness_curve`: Range for curve effect `start-end` (e.g., `0.9-0.3` for decay)
+- `curve_duration`: Duration of the curve in seconds (default: 0.06)
+- `duration`: Duration for continuous events in seconds (default: 0.05)
+
+**Old Format (Backward Compatible):**
+- `letter = name, intensity, sharpness [, curve_direction, duration_ms]`
+- `curve_direction` (optional): "up" or "down"
 - `duration_ms` (optional): Duration of the curve in milliseconds
 
 ### 2. Tracks Section
@@ -90,10 +109,38 @@ h8-8h8-8h8-8h8-8
 s16s16s16s16s16s16s16s16
 ```
 
-## Complete Example
+## Complete Example (New Syntax)
 
 ```
-# Rock Beat
+# Rock Beat - Using new syntax
+bpm = 120
+time = 4/4
+
+# Define instruments with new syntax
+k=kick: continuous; intensity=0.9, sharpness_curve=0.5-0.2; duration=0.1
+s=snare: transient; intensity=0.95, sharpness_curve=0.85-0.3; curve_duration=0.05
+h=hihat: transient; intensity=0.5, sharpness=0.95
+c=crash: transient; intensity=0.95, sharpness_curve=0.9-0.2; curve_duration=0.12
+
+begin
+
+# Kick pattern
+track1
+k8-8k8-8k8-8k8-8
+
+# Snare on 2 and 4
+track2
+-4s8-8-4s8-8
+
+# Hi-hat eighth notes
+track3
+h8h8h8h8h8h8h8h8
+```
+
+## Complete Example (Old Syntax - Still Works)
+
+```
+# Rock Beat - Using old syntax
 bpm = 120
 time = 4/4
 

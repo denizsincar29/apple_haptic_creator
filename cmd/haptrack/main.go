@@ -14,12 +14,15 @@ import (
 
 // HapticDefinition defines what a letter represents
 type HapticDefinition struct {
-	Name      string
-	Intensity float64
-	Sharpness float64
-	HasCurve  bool
-	CurveDown bool // if true, curve goes down
-	CurveDur  float64
+	Name           string
+	Type           string  // "transient" or "continuous"
+	Intensity      float64
+	Sharpness      float64
+	Duration       float64 // for continuous events
+	HasCurve       bool
+	CurveStartSharp float64
+	CurveEndSharp   float64
+	CurveDur       float64
 }
 
 // HaptrackParser parses and executes haptrack DSL
@@ -147,40 +150,112 @@ func (p *HaptrackParser) parseDefinitionLine(line string) error {
 }
 
 // parseHapticDefinition parses a haptic definition
+// New syntax: name: type; param=value, param=value; ...
+// Example: kick: continuous; intensity=0.9, sharpness_curve=0.5-0.2; duration=0.1
 func (p *HaptrackParser) parseHapticDefinition(value string) (HapticDefinition, error) {
-	def := HapticDefinition{}
-	parts := strings.Split(value, ",")
-	
-	if len(parts) < 3 {
-		return def, fmt.Errorf("definition needs at least name, intensity, sharpness")
+	def := HapticDefinition{
+		Type:      "transient", // Default type
+		Intensity: 0.8,         // Default intensity
+		Sharpness: 0.5,         // Default sharpness
+		Duration:  0.05,        // Default duration for continuous (50ms)
 	}
 
-	def.Name = strings.TrimSpace(parts[0])
-	
-	intensity, err := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
-	if err != nil {
-		return def, fmt.Errorf("invalid intensity: %v", err)
+	// Split by colon to separate name:type from parameters
+	mainParts := strings.SplitN(value, ":", 2)
+	if len(mainParts) == 0 {
+		return def, fmt.Errorf("invalid definition format")
 	}
-	def.Intensity = intensity
 
-	sharpness, err := strconv.ParseFloat(strings.TrimSpace(parts[2]), 64)
-	if err != nil {
-		return def, fmt.Errorf("invalid sharpness: %v", err)
-	}
-	def.Sharpness = sharpness
+	def.Name = strings.TrimSpace(mainParts[0])
 
-	// Optional curve
-	if len(parts) >= 5 {
-		curveDir := strings.TrimSpace(strings.ToLower(parts[3]))
-		if curveDir == "down" || curveDir == "up" {
-			def.HasCurve = true
-			def.CurveDown = (curveDir == "down")
-			
-			durMs, err := strconv.ParseFloat(strings.TrimSpace(parts[4]), 64)
-			if err != nil {
-				return def, fmt.Errorf("invalid curve duration: %v", err)
+	// If there's a type and parameters part
+	if len(mainParts) == 2 {
+		paramsPart := mainParts[1]
+
+		// Split by semicolon to get different parameter groups
+		paramGroups := strings.Split(paramsPart, ";")
+
+		for _, group := range paramGroups {
+			group = strings.TrimSpace(group)
+			if group == "" {
+				continue
 			}
-			def.CurveDur = durMs / 1000.0 // Convert ms to seconds
+
+			// Check if this is a type specification (no =)
+			if !strings.Contains(group, "=") && !strings.Contains(group, ",") {
+				groupLower := strings.ToLower(group)
+				if groupLower == "continuous" || groupLower == "transient" {
+					def.Type = groupLower
+					continue
+				}
+			}
+
+			// Parse parameter assignments
+			params := strings.Split(group, ",")
+			for _, param := range params {
+				param = strings.TrimSpace(param)
+				if param == "" {
+					continue
+				}
+
+				// Split by = to get key and value
+				kv := strings.SplitN(param, "=", 2)
+				if len(kv) != 2 {
+					continue
+				}
+
+				key := strings.TrimSpace(kv[0])
+				val := strings.TrimSpace(kv[1])
+
+				switch key {
+				case "intensity":
+					intensity, err := strconv.ParseFloat(val, 64)
+					if err != nil {
+						return def, fmt.Errorf("invalid intensity: %v", err)
+					}
+					def.Intensity = intensity
+
+				case "sharpness":
+					sharpness, err := strconv.ParseFloat(val, 64)
+					if err != nil {
+						return def, fmt.Errorf("invalid sharpness: %v", err)
+					}
+					def.Sharpness = sharpness
+
+				case "sharpness_curve":
+					// Parse curve format: start-end
+					curveParts := strings.Split(val, "-")
+					if len(curveParts) == 2 {
+						start, err1 := strconv.ParseFloat(strings.TrimSpace(curveParts[0]), 64)
+						end, err2 := strconv.ParseFloat(strings.TrimSpace(curveParts[1]), 64)
+						if err1 == nil && err2 == nil {
+							def.HasCurve = true
+							def.CurveStartSharp = start
+							def.CurveEndSharp = end
+							// Default curve duration if not specified
+							if def.CurveDur == 0 {
+								def.CurveDur = 0.06 // 60ms default
+							}
+						}
+					}
+
+				case "curve_duration":
+					// Duration in seconds
+					dur, err := strconv.ParseFloat(val, 64)
+					if err != nil {
+						return def, fmt.Errorf("invalid curve_duration: %v", err)
+					}
+					def.CurveDur = dur
+
+				case "duration":
+					// Duration in seconds
+					dur, err := strconv.ParseFloat(val, 64)
+					if err != nil {
+						return def, fmt.Errorf("invalid duration: %v", err)
+					}
+					def.Duration = dur
+				}
+			}
 		}
 	}
 
@@ -214,31 +289,36 @@ func (p *HaptrackParser) parseTrack(pattern string, trackNum int) error {
 				duration = parseNoteDuration(pattern, &i)
 			}
 
-			// Add the event using At(bar, beat)
 			// Calculate bar and beat from total beats
 			beatsPerBar := p.builder.GetBeatsPerBar()
 			bar := int(currentBeat) / beatsPerBar
 			beat := int(currentBeat) % beatsPerBar
-			p.builder.At(bar, beat).Transient().
-				Intensity(def.Intensity).
-				Sharpness(def.Sharpness).
-				Add()
+
+			// Add the event based on type
+			if def.Type == "continuous" {
+				// Add continuous event
+				p.builder.At(bar, beat).Continuous(def.Duration).
+					Intensity(def.Intensity).
+					Sharpness(def.Sharpness).
+					Add()
+			} else {
+				// Add transient event (default)
+				p.builder.At(bar, beat).Transient().
+					Intensity(def.Intensity).
+					Sharpness(def.Sharpness).
+					Add()
+			}
 
 			// Add curve if defined
 			if def.HasCurve {
-				startSharp := def.Sharpness
-				endSharp := def.Sharpness
-				if def.CurveDown {
-					endSharp = def.Sharpness * 0.3
-				} else {
-					endSharp = def.Sharpness * 1.5
-					if endSharp > 1.0 {
-						endSharp = 1.0
-					}
-				}
-				p.builder.Curve(ahap.CurveHapticSharpness).
-					From(0, startSharp).
-					To(def.CurveDur, endSharp).
+				// Calculate event time in seconds from beats
+				// We need to calculate this based on BPM
+				beatDurationSec := 60.0 / p.bpm
+				eventTime := currentBeat * beatDurationSec
+				
+				p.builder.Curve(ahap.CurveHapticSharpness).At(eventTime).
+					From(0, def.CurveStartSharp).
+					To(def.CurveDur, def.CurveEndSharp).
 					Steps(5).
 					Add()
 			}
