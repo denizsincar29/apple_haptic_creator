@@ -214,8 +214,12 @@ func (p *HaptrackParser) parseTrack(pattern string, trackNum int) error {
 				duration = parseNoteDuration(pattern, &i)
 			}
 
-			// Add the event using AtBeat
-			p.builder.AtBeat(ahap.Beat(currentBeat)).Transient().
+			// Add the event using At(bar, beat)
+			// Calculate bar and beat from total beats
+			beatsPerBar := p.builder.GetBeatsPerBar()
+			bar := int(currentBeat) / beatsPerBar
+			beat := int(currentBeat) % beatsPerBar
+			p.builder.At(bar, beat).Transient().
 				Intensity(def.Intensity).
 				Sharpness(def.Sharpness).
 				Add()

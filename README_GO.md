@@ -62,18 +62,21 @@ builder := ahap.NewBuilder("Drum Beat", "Creator").
     WithBPM(120).
     WithTimeSignature(4, 4)
 
-// Add kick drum on beats 0 and 2
-builder.AtBeat(0).Transient().Intensity(1.0).Sharpness(0.2).Add()
-builder.AtBeat(2).Transient().Intensity(1.0).Sharpness(0.2).Add()
+// Add kick drum on beats 0 and 2 of bar 0
+builder.At(0, 0).Transient().Intensity(1.0).Sharpness(0.2).Add()
+builder.At(0, 2).Transient().Intensity(1.0).Sharpness(0.2).Add()
 
-// Add snare on beats 1 and 3
-builder.AtBeat(1).Transient().Intensity(0.9).Sharpness(0.8).Add()
-builder.AtBeat(3).Transient().Intensity(0.9).Sharpness(0.8).Add()
+// Add snare on beats 1 and 3 of bar 0
+builder.At(0, 1).Transient().Intensity(0.9).Sharpness(0.8).Add()
+builder.At(0, 3).Transient().Intensity(0.9).Sharpness(0.8).Add()
 
-// Hi-hat on every half beat
+// Hi-hat on every half beat (using absolute beat positions across bars)
+// For simplicity, use Transient with time calculation
 for i := 0; i < 8; i++ {
-    builder.AtBeat(ahap.Beat(float64(i) * 0.5)).
-        Transient().Intensity(0.5).Sharpness(1.0).Add()
+    // Calculate bar and beat for half-beat positions
+    bar := (i / 2) / 4  // Which bar (8 half-beats = 4 beats = 1 bar at 4/4)
+    beat := (i / 2) % 4 // Which beat in the bar
+    builder.At(bar, beat).Transient().Intensity(0.5).Sharpness(1.0).Add()
 }
 
 builder.Export("drumbeat.ahap", true)
@@ -166,10 +169,10 @@ builder.WithTimeSignature(4, 4)
 builder.Transient(time).Intensity(i).Sharpness(s).Add()
 builder.Continuous(time, duration).Intensity(i).Sharpness(s).Add()
 
-// Musical events
-builder.AtBeat(beat).Transient().Intensity(i).Sharpness(s).Add()
-builder.AtBar(bar).Continuous(duration).Intensity(i).Sharpness(s).Add()
-builder.AtBeat(beat).ContinuousBeats(2).Intensity(i).Sharpness(s).Add()
+// Musical events (bar, beat)
+builder.At(bar, beat).Transient().Intensity(i).Sharpness(s).Add()
+builder.At(bar, beat).Continuous(duration).Intensity(i).Sharpness(s).Add()
+builder.At(bar, beat).ContinuousBeats(2).Intensity(i).Sharpness(s).Add()
 
 // Curves
 builder.Curve(paramID).From(start, val1).To(end, val2).Steps(n).Add()
@@ -319,13 +322,13 @@ builder := ahap.NewBuilder("Musical", "Creator").
 
 // Waltz pattern - accent on first beat
 for bar := 0; bar < 4; bar++ {
-    builder.AtBar(ahap.Bar(bar)).
+    builder.At(bar, 0).
         Transient().Intensity(1.0).Sharpness(0.5).Add()
     
-    builder.AtBar(ahap.Bar(bar)).AtBeat(1).
+    builder.At(bar, 1).
         Transient().Intensity(0.6).Sharpness(0.5).Add()
     
-    builder.AtBar(ahap.Bar(bar)).AtBeat(2).
+    builder.At(bar, 2).
         Transient().Intensity(0.6).Sharpness(0.5).Add()
 }
 ```

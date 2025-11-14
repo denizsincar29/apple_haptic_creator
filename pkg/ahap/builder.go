@@ -43,6 +43,14 @@ func (b *Builder) WithMusicalContext(musical *MusicalContext) *Builder {
 	return b
 }
 
+// GetBeatsPerBar returns the number of beats per bar in the current time signature
+func (b *Builder) GetBeatsPerBar() int {
+	if b.musical == nil {
+		b.musical = NewMusicalContext(120, 4, 4) // Default context
+	}
+	return b.musical.BeatsPerBar()
+}
+
 // Transient creates a transient event builder
 func (b *Builder) Transient(time float64) *TransientBuilder {
 	return &TransientBuilder{
@@ -64,25 +72,19 @@ func (b *Builder) Continuous(time, duration float64) *ContinuousBuilder {
 	}
 }
 
-// AtBeat creates an event builder at a specific beat
-func (b *Builder) AtBeat(beat Beat) *EventBuilder {
+// At creates an event builder at a specific bar and beat position
+// bar is the bar number (0-based), beat is the beat within that bar (0-based)
+// Example: At(0, 0) is the first beat of the first bar
+//          At(2, 3) is the 4th beat of the 3rd bar
+func (b *Builder) At(bar int, beat int) *EventBuilder {
 	if b.musical == nil {
 		b.musical = NewMusicalContext(120, 4, 4) // Default context
 	}
+	// Calculate total beats: (bar * beats_per_bar) + beat
+	totalBeats := float64(bar*b.musical.BeatsPerBar() + beat)
 	return &EventBuilder{
 		builder: b,
-		time:    b.musical.BeatToSeconds(beat),
-	}
-}
-
-// AtBar creates an event builder at a specific bar
-func (b *Builder) AtBar(bar Bar) *EventBuilder {
-	if b.musical == nil {
-		b.musical = NewMusicalContext(120, 4, 4) // Default context
-	}
-	return &EventBuilder{
-		builder: b,
-		time:    b.musical.BarToSeconds(bar),
+		time:    b.musical.BeatToSeconds(Beat(totalBeats)),
 	}
 }
 
@@ -328,13 +330,11 @@ func (b *Builder) Sequence() *SequenceBuilder {
 }
 
 // TransientsOnBeats adds transient events on specific beats across a range of bars
-// Example: TransientsOnBeats([]Beat{0, 2}, 5, 8) adds transients on beats 0 and 2 in bars 5-8
-func (sb *SequenceBuilder) TransientsOnBeats(beats []Beat, startBar, endBar int, intensity, sharpness float64) *Builder {
+// Example: TransientsOnBeats([]int{0, 2}, 5, 8) adds transients on beats 0 and 2 in bars 5-8
+func (sb *SequenceBuilder) TransientsOnBeats(beats []int, startBar, endBar int, intensity, sharpness float64) *Builder {
 	for bar := startBar; bar <= endBar; bar++ {
-		barTime := sb.builder.musical.BarToSeconds(Bar(bar))
 		for _, beat := range beats {
-			beatTime := sb.builder.musical.BeatToSeconds(beat)
-			sb.builder.Transient(barTime + beatTime).
+			sb.builder.At(bar, beat).Transient().
 				Intensity(intensity).
 				Sharpness(sharpness).
 				Add()
@@ -344,16 +344,16 @@ func (sb *SequenceBuilder) TransientsOnBeats(beats []Beat, startBar, endBar int,
 }
 
 // TransientsOnBeatsInBar adds transient events on specific beats within a single bar
-func (sb *SequenceBuilder) TransientsOnBeatsInBar(beats []Beat, bar int, intensity, sharpness float64) *Builder {
+func (sb *SequenceBuilder) TransientsOnBeatsInBar(beats []int, bar int, intensity, sharpness float64) *Builder {
 	return sb.TransientsOnBeats(beats, bar, bar, intensity, sharpness)
 }
 
 // EveryBeat adds a transient on every beat for a range of bars
 func (sb *SequenceBuilder) EveryBeat(startBar, endBar int, intensity, sharpness float64) *Builder {
 	beatsPerBar := sb.builder.musical.BeatsPerBar()
-	beats := make([]Beat, beatsPerBar)
+	beats := make([]int, beatsPerBar)
 	for i := 0; i < beatsPerBar; i++ {
-		beats[i] = Beat(i)
+		beats[i] = i
 	}
 	return sb.TransientsOnBeats(beats, startBar, endBar, intensity, sharpness)
 }
@@ -369,9 +369,7 @@ func (sb *SequenceBuilder) EveryNthBeat(n int, startBar, endBar int, intensity, 
 		beatInBar := i % beatsPerBar
 		actualBar := startBar + bar
 		if actualBar <= endBar {
-			barTime := sb.builder.musical.BarToSeconds(Bar(actualBar))
-			beatTime := sb.builder.musical.BeatToSeconds(Beat(beatInBar))
-			sb.builder.Transient(barTime + beatTime).
+			sb.builder.At(actualBar, beatInBar).Transient().
 				Intensity(intensity).
 				Sharpness(sharpness).
 				Add()

@@ -16,7 +16,7 @@ func main() {
 		WithTimeSignature(4, 4)
 
 	// Add transients on beats 0 and 2 (1st and 3rd in musical terms) from bars 5 to 8
-	builder1.Sequence().TransientsOnBeats([]ahap.Beat{0, 2}, 5, 8, 1.0, 0.5)
+	builder1.Sequence().TransientsOnBeats([]int{0, 2}, 5, 8, 1.0, 0.5)
 
 	if err := builder1.Export("sequence1.ahap", true); err != nil {
 		log.Fatal(err)
@@ -29,9 +29,9 @@ func main() {
 		WithTimeSignature(4, 4)
 
 	// Kick drum on beats 0 and 2
-	builder2.Sequence().TransientsOnBeats([]ahap.Beat{0, 2}, 0, 3, 1.0, 0.2)
+	builder2.Sequence().TransientsOnBeats([]int{0, 2}, 0, 3, 1.0, 0.2)
 	// Snare on beats 1 and 3 with different sharpness
-	builder2.Sequence().TransientsOnBeats([]ahap.Beat{1, 3}, 0, 3, 0.9, 0.8)
+	builder2.Sequence().TransientsOnBeats([]int{1, 3}, 0, 3, 0.9, 0.8)
 
 	if err := builder2.Export("sequence2.ahap", true); err != nil {
 		log.Fatal(err)
@@ -70,17 +70,16 @@ func main() {
 	// Create a pattern where each bar has a different feel
 	builder5.Sequence().Pattern(0, 3, func(b *ahap.Builder, bar int) {
 		// First beat of each bar is always strong (beat 0)
-		barStart := float64(bar) * 4 // 4 beats per bar at 120 BPM
-		b.AtBeat(ahap.Beat(barStart)).Transient().Intensity(1.0).Sharpness(0.8).Add()
+		b.At(bar, 0).Transient().Intensity(1.0).Sharpness(0.8).Add()
 		
 		// Other beats vary by bar
 		if bar%2 == 0 {
 			// Even bars: add on beat 2
-			b.AtBeat(ahap.Beat(barStart + 2)).Transient().Intensity(0.7).Sharpness(0.5).Add()
+			b.At(bar, 2).Transient().Intensity(0.7).Sharpness(0.5).Add()
 		} else {
 			// Odd bars: add on beats 1 and 3
-			b.AtBeat(ahap.Beat(barStart + 1)).Transient().Intensity(0.6).Sharpness(0.6).Add()
-			b.AtBeat(ahap.Beat(barStart + 3)).Transient().Intensity(0.6).Sharpness(0.6).Add()
+			b.At(bar, 1).Transient().Intensity(0.6).Sharpness(0.6).Add()
+			b.At(bar, 3).Transient().Intensity(0.6).Sharpness(0.6).Add()
 		}
 	})
 

@@ -99,12 +99,16 @@ func main() {
 				fmt.Println("Usage: beat <beat> <intensity> <sharpness>")
 				continue
 			}
-			beat, _ := strconv.ParseFloat(parts[1], 64)
+			beat, _ := strconv.Atoi(parts[1])
 			intensity, _ := strconv.ParseFloat(parts[2], 64)
 			sharpness, _ := strconv.ParseFloat(parts[3], 64)
-			builder.AtBeat(ahap.Beat(beat)).Transient().Intensity(intensity).Sharpness(sharpness).Add()
+			// Calculate bar and beat from absolute beat number
+			beatsPerBar := builder.GetBeatsPerBar()
+			bar := beat / beatsPerBar
+			beatInBar := beat % beatsPerBar
+			builder.At(bar, beatInBar).Transient().Intensity(intensity).Sharpness(sharpness).Add()
 			eventCount++
-			fmt.Printf("Added transient at beat %.1f (total: %d events)\n", beat, eventCount)
+			fmt.Printf("Added transient at beat %d (bar %d, beat %d) (total: %d events)\n", beat, bar, beatInBar, eventCount)
 
 		case "bar":
 			if *bpm == 0 {
@@ -115,12 +119,12 @@ func main() {
 				fmt.Println("Usage: bar <bar> <intensity> <sharpness>")
 				continue
 			}
-			bar, _ := strconv.ParseFloat(parts[1], 64)
+			bar, _ := strconv.Atoi(parts[1])
 			intensity, _ := strconv.ParseFloat(parts[2], 64)
 			sharpness, _ := strconv.ParseFloat(parts[3], 64)
-			builder.AtBar(ahap.Bar(bar)).Transient().Intensity(intensity).Sharpness(sharpness).Add()
+			builder.At(bar, 0).Transient().Intensity(intensity).Sharpness(sharpness).Add()
 			eventCount++
-			fmt.Printf("Added transient at bar %.1f (total: %d events)\n", bar, eventCount)
+			fmt.Printf("Added transient at bar %d (total: %d events)\n", bar, eventCount)
 
 		case "export", "save":
 			err := builder.Export(*output, *indent)

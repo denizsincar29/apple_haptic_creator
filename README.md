@@ -60,13 +60,13 @@ builder := ahap.NewBuilder("Drum Beat", "Creator").
     WithBPM(120).
     WithTimeSignature(4, 4)
 
-// Add kick drum on beats 0 and 2
-builder.AtBeat(0).Transient().Intensity(1.0).Sharpness(0.2).Add()
-builder.AtBeat(2).Transient().Intensity(1.0).Sharpness(0.2).Add()
+// Add kick drum on beats 0 and 2 of bar 0
+builder.At(0, 0).Transient().Intensity(1.0).Sharpness(0.2).Add()
+builder.At(0, 2).Transient().Intensity(1.0).Sharpness(0.2).Add()
 
-// Add snare on beats 1 and 3
-builder.AtBeat(1).Transient().Intensity(0.9).Sharpness(0.8).Add()
-builder.AtBeat(3).Transient().Intensity(0.9).Sharpness(0.8).Add()
+// Add snare on beats 1 and 3 of bar 0
+builder.At(0, 1).Transient().Intensity(0.9).Sharpness(0.8).Add()
+builder.At(0, 3).Transient().Intensity(0.9).Sharpness(0.8).Add()
 
 builder.Export("drumbeat.ahap", true)
 ```

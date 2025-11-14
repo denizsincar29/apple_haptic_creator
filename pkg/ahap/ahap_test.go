@@ -157,26 +157,26 @@ func TestBuilderMusical(t *testing.T) {
 		WithTimeSignature(4, 4)
 
 	ahap := b.
-		AtBeat(0).Transient().Intensity(1.0).Add().
-		AtBeat(1).Transient().Intensity(0.8).Add().
-		AtBar(1).Continuous(1.0).Intensity(0.5).Add().
+		At(0, 0).Transient().Intensity(1.0).Add().
+		At(0, 1).Transient().Intensity(0.8).Add().
+		At(1, 0).Continuous(1.0).Intensity(0.5).Add().
 		Build()
 
 	if len(ahap.Pattern) != 3 {
 		t.Errorf("Expected 3 patterns, got %d", len(ahap.Pattern))
 	}
 
-	// First event should be at time 0
+	// First event should be at time 0 (bar 0, beat 0)
 	if ahap.Pattern[0].Event.Time != 0.0 {
 		t.Errorf("Expected first event at time 0.0, got %f", ahap.Pattern[0].Event.Time)
 	}
 
-	// Second event should be at time 0.5 (beat 1 at 120 BPM)
+	// Second event should be at time 0.5 (bar 0, beat 1 at 120 BPM)
 	if ahap.Pattern[1].Event.Time != 0.5 {
 		t.Errorf("Expected second event at time 0.5, got %f", ahap.Pattern[1].Event.Time)
 	}
 
-	// Third event should be at time 2.0 (bar 1 at 120 BPM in 4/4)
+	// Third event should be at time 2.0 (bar 1, beat 0 at 120 BPM in 4/4)
 	if ahap.Pattern[2].Event.Time != 2.0 {
 		t.Errorf("Expected third event at time 2.0, got %f", ahap.Pattern[2].Event.Time)
 	}

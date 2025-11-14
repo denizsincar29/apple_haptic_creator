@@ -99,9 +99,9 @@ builder := ahap.NewBuilder("Drum Beat", "Creator").
     WithBPM(120).
     WithTimeSignature(4, 4)
 
-// Add beats
+// Add beats (bar 0, beats 0-3)
 for i := 0; i < 4; i++ {
-    builder.AtBeat(ahap.Beat(i)).
+    builder.At(0, i).
         Transient().Intensity(1.0).Sharpness(0.5).Add()
 }
 
@@ -132,10 +132,10 @@ builder := ahap.NewBuilder("Pattern", "Creator").
     WithTimeSignature(4, 4)
 
 // Add transients on beats 0 and 2 (1st and 3rd) from bars 5 to 8
-builder.Sequence().TransientsOnBeats([]ahap.Beat{0, 2}, 5, 8, 1.0, 0.5)
+builder.Sequence().TransientsOnBeats([]int{0, 2}, 5, 8, 1.0, 0.5)
 
 // Add different pattern on beats 1 and 3 (2nd and 4th)
-builder.Sequence().TransientsOnBeats([]ahap.Beat{1, 3}, 5, 8, 0.9, 0.8)
+builder.Sequence().TransientsOnBeats([]int{1, 3}, 5, 8, 0.9, 0.8)
 
 builder.Export("sequence.ahap", true)
 ```

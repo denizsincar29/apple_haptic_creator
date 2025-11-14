@@ -32,7 +32,7 @@ func main() {
 		WithBPM(120).
 		WithTimeSignature(4, 4)
 	
-	// Create a 4-beat pattern
+	// Create a 4-beat pattern (bar 0, beats 0-3)
 	for beat := 0; beat < 4; beat++ {
 		intensity := 1.0
 		if beat == 0 {
@@ -40,7 +40,7 @@ func main() {
 		} else {
 			intensity = 0.7
 		}
-		musical.AtBeat(ahap.Beat(beat)).
+		musical.At(0, beat).
 			Transient().
 			Intensity(intensity).
 			Sharpness(0.5).

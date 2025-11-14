@@ -224,11 +224,8 @@ func (b *Builder) Transient(time float64) *TransientBuilder
 // Continuous adds a haptic continuous event
 func (b *Builder) Continuous(time, duration float64) *ContinuousBuilder
 
-// AtBeat adds event at specific beat
-func (b *Builder) AtBeat(beat Beat) *EventBuilder
-
-// AtBar adds event at specific bar
-func (b *Builder) AtBar(bar Bar) *EventBuilder
+// At adds event at specific bar and beat
+func (b *Builder) At(bar, beat int) *EventBuilder
 
 // Build returns the final AHAP
 func (b *Builder) Build() *AHAP
@@ -250,11 +247,11 @@ ahap := ahap.New("My Haptic", "Creator").
 ahap := ahap.New("Musical Haptic", "Creator").
     WithBPM(120).
     WithTimeSignature(4, 4).
-    AtBeat(0).Transient().Intensity(1.0).Sharpness(1.0).Add().
-    AtBeat(1).Transient().Intensity(0.8).Sharpness(0.8).Add().
-    AtBeat(2).Transient().Intensity(0.8).Sharpness(0.8).Add().
-    AtBeat(3).Transient().Intensity(0.8).Sharpness(0.8).Add().
-    AtBar(1).Continuous(Bar(1)).Intensity(0.5).Sharpness(0.3).Add().
+    At(0, 0).Transient().Intensity(1.0).Sharpness(1.0).Add().
+    At(0, 1).Transient().Intensity(0.8).Sharpness(0.8).Add().
+    At(0, 2).Transient().Intensity(0.8).Sharpness(0.8).Add().
+    At(0, 3).Transient().Intensity(0.8).Sharpness(0.8).Add().
+    At(1, 0).Continuous(1.0).Intensity(0.5).Sharpness(0.3).Add().
     Build()
 
 // With curves
