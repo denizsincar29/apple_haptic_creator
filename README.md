@@ -1,53 +1,155 @@
 # Apple Haptic Creator
 
-This Python class allows you to create Apple Haptic pattern files. With this class, you can define haptic and audio events, as well as parameter curves, to create custom haptic patterns for devices that support the Apple Haptic API.
+A powerful Go library and command-line tools for creating Apple Haptic pattern files (AHAP). Features include a beautiful fluent API, musical timing support (BPM, bars, beats, time signatures), and MIDI to haptics conversion.
 
 ## What are AHAP files?
 
-AHAP files are JSON-formatted special Apple Haptic pattern files. They are commonly used in iOS games and applications to create immersive experiences. However, I recently discovered that you can play AHAP files directly from the Files app or any other apps that support Apple's Quick Look API. This means that you can freely share an AHAP file via platforms like WhatsApp or Telegram. It's worth noting that WhatsApp has limitations on loading large AHAP files. I wrote an article about Apple Haptics on [Applevis](https://applevis.com/forum/ios-ipados/now-possible-ios-17-can-play-haptic-signals-vibrations-special-ahap-apple-haptic). Feel free to check it out for more information.
+AHAP files are JSON-formatted Apple Haptic pattern files used in iOS games and applications to create immersive haptic experiences. They can be played directly from the Files app or any apps that support Apple's Quick Look API, making them shareable via WhatsApp, Telegram, and other platforms.
 
-## What's in the repo
+For more information, see this [article on AppleVis](https://applevis.com/forum/ios-ipados/now-possible-ios-17-can-play-haptic-signals-vibrations-special-ahap-apple-haptic).
 
-- ahaps/: Examples folder.
-- ahap.py: Module for creating AHAP (Apple Haptic) files.
-- makeahap.py: A file that creates a motorcycle sound with vibrations.
-- music.py: An attempt to create musical notes via haptics, but failed.
+## ✨ Features
 
-## Requirements
+- **Beautiful Fluent API** - Chain methods for intuitive haptic creation
+- **Musical Timing** - Support for BPM, bars, beats, and time signatures
+- **MIDI Conversion** - Convert MIDI files to haptic patterns
+- **High Performance** - Fast Go implementation
+- **Zero Dependencies** - Core library uses only Go standard library
+- **Clean Architecture** - Reusable package with multiple CLI utilities
 
-My script will run on Python 3.6+ and doesn't require any additional modules. However, if you want to run music.py, you can install the librosa module by running the following command:
+## 🚀 Quick Start
+
+### Installation
+
 ```bash
-pip install librosa
+# Clone the repository
+git clone https://github.com/denizsincar29/apple_haptic_creator.git
+cd apple_haptic_creator
+
+# Build all commands
+go build -o bin/makeahap cmd/makeahap/main.go
+go build -o bin/midi2ahap cmd/midi2ahap/main.go
+go build -o bin/ahapgen cmd/ahapgen/main.go
 ```
 
-## How to Use
-```python
-# Create an instance of the AHAP class to start creating an AHAP file.
-from ahap import AHAP, CurveParamID, HapticCurve, create_curve
+### Using as a Library
 
-ahap = AHAP()
+```go
+package main
 
-# Add events to the pattern by using the available methods of the AHAP class. For example, to add a haptic continuous event:
-ahap.add_haptic_continuous_event(time=0.5, event_duration=1.0, haptic_intensity=0.8, haptic_sharpness=0.5)
+import "github.com/denizsincar29/apple_haptic_creator/pkg/ahap"
 
-# Add parameter curves to dynamically change haptic or audio parameters over time. For example, to add a haptic sharpness curve:
-curve = create_curve(start_time=0.0, end_time=1.0, start_value=0.4, end_value=0.8, total=10)
-ahap.add_parameter_curve(CurveParamID.H_Sharpness, start_time=0.0, control_points=curve)
-
-# Export the AHAP file by calling the export() method.
-ahap.export(filename="example.ahap")
+func main() {
+    // Simple example
+    builder := ahap.NewBuilder("My Haptic", "Me")
+    builder.
+        Transient(0.0).Intensity(1.0).Sharpness(0.5).Add().
+        Continuous(1.0, 2.0).Intensity(0.8).Sharpness(0.7).Add().
+        Export("example.ahap", true)
+}
 ```
 
-You can run the makeahap.py file to generate a sample AHAP file with a truly great motorcycle sound!
+### Musical Timing Example
 
-## Examples
+```go
+// Create a drum beat pattern at 120 BPM
+builder := ahap.NewBuilder("Drum Beat", "Creator").
+    WithBPM(120).
+    WithTimeSignature(4, 4)
 
-The ahaps/ folder contains example AHAP files that you can use as a reference or starting point for creating your own haptic patterns.
+// Add kick drum on beats 0 and 2
+builder.AtBeat(0).Transient().Intensity(1.0).Sharpness(0.2).Add()
+builder.AtBeat(2).Transient().Intensity(1.0).Sharpness(0.2).Add()
 
-## Known Limitations
+// Add snare on beats 1 and 3
+builder.AtBeat(1).Transient().Intensity(0.9).Sharpness(0.8).Add()
+builder.AtBeat(3).Transient().Intensity(0.9).Sharpness(0.8).Add()
 
-- The music.py file does not currently generate musical notes via haptics as intended. Further development is required to achieve this functionality.
+builder.Export("drumbeat.ahap", true)
+```
 
-## Contributing
+## 🎯 Command Line Tools
 
-Contributions are welcome! If you have an idea for an improvement or found a bug, please open an issue on GitHub or submit a pull request.
+### makeahap - Motorcycle Sound Example
+
+```bash
+go run cmd/makeahap/main.go -output bike.ahap -indent
+```
+
+Creates a realistic motorcycle engine sound using haptics.
+
+### midi2ahap - MIDI to Haptics Converter
+
+```bash
+go run cmd/midi2ahap/main.go -input song.mid -output song.ahap -indent
+```
+
+Converts MIDI files to haptic patterns, mapping notes to sharpness and velocity to intensity.
+
+### ahapgen - Interactive Haptic Generator
+
+```bash
+go run cmd/ahapgen/main.go -bpm 120 -time 4/4 -o output.ahap
+```
+
+Interactive command-line tool with support for musical timing.
+
+## 📚 Documentation
+
+For complete API documentation and advanced examples, see [README_GO.md](README_GO.md).
+
+## 📁 Project Structure
+
+```
+.
+├── pkg/ahap/              # Core library package
+│   ├── ahap.go           # Core AHAP types
+│   ├── events.go         # Event creation
+│   ├── curves.go         # Parameter curves
+│   ├── musical.go        # Musical timing (BPM, bars, beats)
+│   ├── builder.go        # Fluent API builder
+│   └── ahap_test.go      # Tests
+├── cmd/                   # Command-line utilities
+│   ├── makeahap/         # Motorcycle sound example
+│   ├── midi2ahap/        # MIDI converter
+│   └── ahapgen/          # Interactive generator
+├── ahaps/                 # Example AHAP files
+└── demo/                  # Demo files (including MIDI)
+```
+
+## 🧪 Testing
+
+```bash
+go test ./pkg/ahap/        # Run tests
+go test -cover ./pkg/ahap/ # With coverage
+```
+
+## 📖 Examples
+
+The `ahaps/` folder contains example AHAP files:
+- `bike.ahap` - Motorcycle engine sound
+- `interval.ahap` - Simple interval pattern
+- `music.ahap` - Musical pattern
+- `notes.ahap` - Musical notes
+
+Demo MIDI files for testing:
+- `demo/themeters.mid` - Example MIDI file
+- `demo/donnalee.mid` - Example MIDI file
+
+## 🤝 Contributing
+
+Contributions are welcome! Areas for improvement:
+- Additional curve interpolation methods
+- More MIDI conversion options
+- Haptic pattern templates library
+- Visualization tools
+- Pattern analysis utilities
+
+## 📄 License
+
+See [IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md) for complete implementation details.
+
+## 🙏 Credits
+
+- Original Python implementation by Deniz Sincar
+- Go rewrite with enhanced features and musical timing support
