@@ -14,7 +14,6 @@ func main() {
 	flag.Parse()
 
 	fmt.Println("Creating motorcycle sound haptic pattern...")
-	fmt.Println("Note: See examples/bike.go for the full implementation")
 
 	// Create the AHAP with builder
 	builder := ahap.NewBuilder("bike sound", "Deniz Sincar")

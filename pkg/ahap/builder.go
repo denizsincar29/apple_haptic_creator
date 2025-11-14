@@ -311,3 +311,80 @@ func (ctb *CurveToBuilder) Exponential(steps int, exponent float64) *CurveBuilde
 	ctb.curveBuilder.points = append(ctb.curveBuilder.points, points...)
 	return ctb.curveBuilder
 }
+
+// SequenceBuilder helps build sequences of events across multiple bars/beats
+type SequenceBuilder struct {
+	builder *Builder
+}
+
+// Sequence creates a new sequence builder for creating patterns
+func (b *Builder) Sequence() *SequenceBuilder {
+	if b.musical == nil {
+		b.musical = NewMusicalContext(120, 4, 4) // Default context
+	}
+	return &SequenceBuilder{
+		builder: b,
+	}
+}
+
+// TransientsOnBeats adds transient events on specific beats across a range of bars
+// Example: TransientsOnBeats([]Beat{0, 2}, 5, 8) adds transients on beats 0 and 2 in bars 5-8
+func (sb *SequenceBuilder) TransientsOnBeats(beats []Beat, startBar, endBar int, intensity, sharpness float64) *Builder {
+	for bar := startBar; bar <= endBar; bar++ {
+		barTime := sb.builder.musical.BarToSeconds(Bar(bar))
+		for _, beat := range beats {
+			beatTime := sb.builder.musical.BeatToSeconds(beat)
+			sb.builder.Transient(barTime + beatTime).
+				Intensity(intensity).
+				Sharpness(sharpness).
+				Add()
+		}
+	}
+	return sb.builder
+}
+
+// TransientsOnBeatsInBar adds transient events on specific beats within a single bar
+func (sb *SequenceBuilder) TransientsOnBeatsInBar(beats []Beat, bar int, intensity, sharpness float64) *Builder {
+	return sb.TransientsOnBeats(beats, bar, bar, intensity, sharpness)
+}
+
+// EveryBeat adds a transient on every beat for a range of bars
+func (sb *SequenceBuilder) EveryBeat(startBar, endBar int, intensity, sharpness float64) *Builder {
+	beatsPerBar := sb.builder.musical.BeatsPerBar()
+	beats := make([]Beat, beatsPerBar)
+	for i := 0; i < beatsPerBar; i++ {
+		beats[i] = Beat(i)
+	}
+	return sb.TransientsOnBeats(beats, startBar, endBar, intensity, sharpness)
+}
+
+// EveryNthBeat adds a transient on every nth beat for a range of bars (e.g., every 2nd beat = on-beat)
+func (sb *SequenceBuilder) EveryNthBeat(n int, startBar, endBar int, intensity, sharpness float64) *Builder {
+	beatsPerBar := sb.builder.musical.BeatsPerBar()
+	totalBars := endBar - startBar + 1
+	totalBeats := totalBars * beatsPerBar
+	
+	for i := 0; i < totalBeats; i += n {
+		bar := i / beatsPerBar
+		beatInBar := i % beatsPerBar
+		actualBar := startBar + bar
+		if actualBar <= endBar {
+			barTime := sb.builder.musical.BarToSeconds(Bar(actualBar))
+			beatTime := sb.builder.musical.BeatToSeconds(Beat(beatInBar))
+			sb.builder.Transient(barTime + beatTime).
+				Intensity(intensity).
+				Sharpness(sharpness).
+				Add()
+		}
+	}
+	return sb.builder
+}
+
+// Pattern applies a custom pattern function to each bar
+// The function receives the bar number and should add events to the builder
+func (sb *SequenceBuilder) Pattern(startBar, endBar int, fn func(b *Builder, bar int)) *Builder {
+	for bar := startBar; bar <= endBar; bar++ {
+		fn(sb.builder, bar)
+	}
+	return sb.builder
+}

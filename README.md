@@ -12,6 +12,8 @@ For more information, see this [article on AppleVis](https://applevis.com/forum/
 
 - **Beautiful Fluent API** - Chain methods for intuitive haptic creation
 - **Musical Timing** - Support for BPM, bars, beats, and time signatures
+- **Sequence Builder** - Create complex patterns across multiple bars with ease
+- **Haptrack DSL** - Musical notation-inspired language for haptic composition
 - **MIDI Conversion** - Convert MIDI files to haptic patterns
 - **High Performance** - Fast Go implementation
 - **Zero Dependencies** - Core library uses only Go standard library
@@ -30,6 +32,7 @@ cd apple_haptic_creator
 go build -o bin/makeahap cmd/makeahap/main.go
 go build -o bin/midi2ahap cmd/midi2ahap/main.go
 go build -o bin/ahapgen cmd/ahapgen/main.go
+go build -o bin/haptrack cmd/haptrack/main.go
 ```
 
 ### Using as a Library
@@ -94,6 +97,31 @@ go run cmd/ahapgen/main.go -bpm 120 -time 4/4 -o output.ahap
 
 Interactive command-line tool with support for musical timing.
 
+### haptrack - Haptic Pattern DSL
+
+```bash
+go run cmd/haptrack/main.go -input pattern.hap -output pattern.ahap
+```
+
+Domain-specific language for creating haptic patterns using musical notation. Define "instruments" with letters and compose them into tracks.
+
+**Example pattern file:**
+```
+bpm = 120
+time = 4/4
+s = snare, 1.0, 0.9, down, 60
+k = kick, 1.0, 0.2
+h = hihat, 0.6, 1.0
+
+begin
+track1
+k8k8s8k8k8k8s8k8
+track2
+h8h8h8h8h8h8h8h8
+```
+
+See [cmd/haptrack/README.md](cmd/haptrack/README.md) for complete documentation.
+
 ## 📚 Documentation
 
 For complete API documentation and advanced examples, see [README_GO.md](README_GO.md).
@@ -112,7 +140,9 @@ For complete API documentation and advanced examples, see [README_GO.md](README_
 ├── cmd/                   # Command-line utilities
 │   ├── makeahap/         # Motorcycle sound example
 │   ├── midi2ahap/        # MIDI converter
-│   └── ahapgen/          # Interactive generator
+│   ├── ahapgen/          # Interactive generator
+│   └── haptrack/         # Haptic pattern DSL
+├── examples/              # Example code and patterns
 ├── ahaps/                 # Example AHAP files
 └── demo/                  # Demo files (including MIDI)
 ```
