@@ -87,7 +87,19 @@ Creates a realistic motorcycle engine sound using haptics.
 go run cmd/midi2ahap/main.go -input song.mid -output song.ahap -indent
 ```
 
-Converts MIDI files to haptic patterns, mapping notes to sharpness and velocity to intensity.
+Converts MIDI files to haptic patterns with intelligent drum detection:
+- **Melodic notes**: Converted to continuous events, mapping frequency to sharpness
+- **Drum channel (10)**: Converted to transient events with optimized characteristics
+- **Drum mapping**: 50+ General MIDI drum sounds mapped to appropriate haptic profiles
+  - Bass drums: High intensity, low sharpness
+  - Snares: High intensity, high sharpness  
+  - Hi-hats: Medium intensity, very high sharpness
+  - Cymbals: High intensity, high sharpness with decay
+  - Percussion: Varied profiles based on sound type
+
+Options:
+- `-drums=true/false`: Enable/disable drum detection (default: true)
+- `-indent`: Pretty-print JSON output
 
 ### ahapgen - Interactive Haptic Generator
 
