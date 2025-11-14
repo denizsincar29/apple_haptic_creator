@@ -1,0 +1,30 @@
+# Complex Haptrack Example
+# Rock drum pattern with multiple instruments
+
+bpm = 140
+time = 4/4
+
+# Define drum sounds
+s = snare, 0.95, 0.85, down, 50
+k = kick, 1.0, 0.15
+h = hihat_closed, 0.5, 0.95
+o = hihat_open, 0.7, 0.8, down, 80
+t = tom_high, 0.85, 0.6
+m = tom_mid, 0.85, 0.5
+l = tom_low, 0.90, 0.4
+c = crash, 0.95, 0.9, down, 120
+r = ride, 0.6, 0.7
+
+begin
+
+# Kick drum pattern
+track1
+k8-8k8-8k8-8k8-8k8-8k8-8k8k8k8-8
+
+# Snare on 2 and 4
+track2
+-4s8-8-4s8-8-4s8-8-4s8s8s8
+
+# Hi-hat eighth notes
+track3
+h8h8h8h8h8h8h8h8h8h8h8h8h8h8h8h8

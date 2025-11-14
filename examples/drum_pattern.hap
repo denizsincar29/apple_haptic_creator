@@ -1,0 +1,21 @@
+# Haptrack Example - Drum Pattern
+# Define settings
+bpm = 120
+time = 4/4
+
+# Define haptic sounds
+# Format: letter = name, intensity, sharpness [, curve_direction, duration_ms]
+s = snare, 1.0, 0.9, down, 60
+k = kick, 1.0, 0.2
+h = hihat, 0.6, 1.0
+t = tom, 0.8, 0.5
+c = crash, 0.9, 0.8, down, 100
+
+# Begin track patterns
+begin
+
+track1
+k8k8s8k8k8k8s8k8
+
+track2
+h8h8h8h8h8h8h8h8
