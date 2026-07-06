@@ -152,7 +152,14 @@ def convert(input_path: str, output_path: str, use_drums: bool = True, indent: O
 
     for track in mid.tracks:
         current_time = 0.0
-        note_on_times: Dict[int, tuple] = {}  # key -> (start_time, velocity)
+        # Keyed by (channel, note), not just note: a MIDI file with several
+        # channels active at once (very common - almost every real-world
+        # song MIDI has one channel per instrument) can easily have two
+        # channels holding the same pitch simultaneously. Keying by note
+        # alone let a note-on on one channel clobber another channel's
+        # still-open note of the same pitch, corrupting durations or
+        # dropping notes outright.
+        note_on_times: Dict[tuple, tuple] = {}  # (channel, note) -> (start_time, velocity)
 
         for msg in track:
             # mido gives delta times in ticks per message; convert using the
@@ -175,12 +182,12 @@ def convert(input_path: str, output_path: str, use_drums: bool = True, indent: O
                         drum_count += 1
                         unknown_drum_count += 1
                 else:
-                    note_on_times[msg.note] = (current_time, msg.velocity)
+                    note_on_times[(msg.channel, msg.note)] = (current_time, msg.velocity)
 
             # A note_on with velocity 0 is a note_off per the MIDI spec.
             elif (msg.type == "note_off") or (msg.type == "note_on" and msg.velocity == 0):
                 if not (use_drums and msg.channel == DRUM_CHANNEL):
-                    start = note_on_times.pop(msg.note, None)
+                    start = note_on_times.pop((msg.channel, msg.note), None)
                     if start is not None:
                         start_time, velocity = start
                         duration = current_time - start_time
