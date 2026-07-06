@@ -141,14 +141,32 @@ def add_drum_hit(ahap: AHAP, t: float, mapping: DrumMapping, intensity: float) -
         ahap.add_haptic_transient_event(t, intensity, mapping.sharpness)
 
 
-def convert(input_path: str, output_path: str, use_drums: bool = True, indent: Optional[int] = None) -> dict:
-    """Converts a MIDI file to AHAP. Returns a stats dict."""
+def convert(
+    input_path: str,
+    output_path: str,
+    no_drums: bool = False,
+    drums_as_melody: bool = False,
+    debug_channels: bool = False,
+    indent: Optional[int] = None,
+) -> dict:
+    """Converts a MIDI file to AHAP. Returns a stats dict.
+
+    Channel 10 (GM drums) handling, in order of precedence:
+    - default: realistic per-instrument drum haptics (see add_drum_hit)
+    - no_drums=True: channel 10 is fully ignored, no events at all from it
+    - drums_as_melody=True: channel 10 notes are treated as regular melodic
+      notes instead (mutually exclusive with no_drums)
+    """
+    if no_drums and drums_as_melody:
+        raise ValueError("no_drums and drums_as_melody are mutually exclusive")
+
     mid = mido.MidiFile(input_path)
     ahap = AHAP(description=f"midi file {input_path}", created_by="midi to haptic generator (python)")
 
     drum_count = 0
     unknown_drum_count = 0
     melodic_count = 0
+    channel_counts: Dict[int, int] = {}
 
     for track in mid.tracks:
         current_time = 0.0
@@ -171,7 +189,12 @@ def convert(input_path: str, output_path: str, use_drums: bool = True, indent: O
                 _set_current_tempo(track, msg.tempo)
 
             if msg.type == "note_on" and msg.velocity > 0:
-                if use_drums and msg.channel == DRUM_CHANNEL:
+                is_drum_channel = msg.channel == DRUM_CHANNEL
+                channel_counts[msg.channel] = channel_counts.get(msg.channel, 0) + 1
+
+                if is_drum_channel and no_drums:
+                    pass  # fully ignored: no event, no note_on_times entry
+                elif is_drum_channel and not drums_as_melody:
                     velocity_scale = msg.velocity / 127.0
                     mapping = DRUM_MAPPINGS.get(msg.note)
                     if mapping is not None:
@@ -182,11 +205,14 @@ def convert(input_path: str, output_path: str, use_drums: bool = True, indent: O
                         drum_count += 1
                         unknown_drum_count += 1
                 else:
+                    # Either a melodic channel, or channel 10 with drums_as_melody.
                     note_on_times[(msg.channel, msg.note)] = (current_time, msg.velocity)
 
             # A note_on with velocity 0 is a note_off per the MIDI spec.
             elif (msg.type == "note_off") or (msg.type == "note_on" and msg.velocity == 0):
-                if not (use_drums and msg.channel == DRUM_CHANNEL):
+                is_drum_channel = msg.channel == DRUM_CHANNEL
+                treated_as_melodic = not is_drum_channel or drums_as_melody
+                if treated_as_melodic:
                     start = note_on_times.pop((msg.channel, msg.note), None)
                     if start is not None:
                         start_time, velocity = start
@@ -199,6 +225,14 @@ def convert(input_path: str, output_path: str, use_drums: bool = True, indent: O
                                     sharpness = 0.5
                                 ahap.add_haptic_continuous_event(start_time, duration, velocity / 127.0, sharpness)
                             melodic_count += 1
+
+    if debug_channels:
+        print("Note-on events per channel (1-indexed for readability):")
+        for channel in sorted(channel_counts):
+            count = channel_counts[channel]
+            if count > 0:
+                marker = " (GM drum channel)" if channel == DRUM_CHANNEL else ""
+                print(f"  channel {channel + 1}: {count} events{marker}")
 
     ahap.export(output_path, path=".", indent=indent)
 
@@ -229,7 +263,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Convert a MIDI file to an AHAP haptic pattern.")
     parser.add_argument("input", help="input .mid file")
     parser.add_argument("output", nargs="?", default=None, help="output .ahap file (default: <input>.ahap)")
-    parser.add_argument("--no-drums", action="store_true", help="treat channel 10 as regular melodic notes")
+    parser.add_argument("--no-drums", action="store_true", help="completely ignore channel 10 (GM drums) - no events at all from it")
+    parser.add_argument("--drums-as-melody", action="store_true", help="treat channel 10 as regular melodic notes instead of GM drums (rather than dropping it - see --no-drums)")
+    parser.add_argument("--debug-channels", action="store_true", help="print how many note-on events came from each channel")
     parser.add_argument("--indent", type=int, default=None, help="indent the JSON output for readability")
     args = parser.parse_args()
 
@@ -238,7 +274,16 @@ def main() -> None:
         stem = args.input.rsplit(".", 1)[0]
         output = f"{stem}.ahap"
 
-    stats = convert(args.input, output, use_drums=not args.no_drums, indent=args.indent)
+    if args.no_drums and args.drums_as_melody:
+        parser.error("--no-drums and --drums-as-melody are mutually exclusive")
+
+    stats = convert(
+        args.input, output,
+        no_drums=args.no_drums,
+        drums_as_melody=args.drums_as_melody,
+        debug_channels=args.debug_channels,
+        indent=args.indent,
+    )
 
     print(f"Successfully created {output}")
     print("Conversion statistics:")
