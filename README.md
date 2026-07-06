@@ -1,5 +1,9 @@
 # Apple Haptic Creator
 
+> **Note:** this is the old Python version, kept here for history. There's a
+> much cooler, more complete Rust rewrite with more tools and features here:
+> [github.com/denizsincar29/ahap_rs](https://github.com/denizsincar29/ahap_rs)
+
 This Python class allows you to create Apple Haptic pattern files. With this class, you can define haptic and audio events, as well as parameter curves, to create custom haptic patterns for devices that support the Apple Haptic API.
 
 ## What are AHAP files?
