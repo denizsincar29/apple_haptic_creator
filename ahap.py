@@ -86,6 +86,33 @@ def create_curve(start_time: float, end_time: float, start_value: float, end_val
     return curvelist
 
 
+def create_ease_in_out_curve(start_time: float, end_time: float, start_value: float, end_value: float, total=10):
+    """Same shape as create_curve but smoothstep-interpolated (slow start/end,
+    faster middle) instead of linear - matches the decay curves used by the
+    Go/Rust ports for things like a cymbal ringing down."""
+    timediff = end_time - start_time
+    valuediff = end_value - start_value
+    curvelist = []
+    for i in range(total):
+        t = (i + 1) / total
+        smooth_t = t * t * (3 - 2 * t)
+        curvelist.append(HapticCurve(start_time + timediff * t, start_value + valuediff * smooth_t))
+    return curvelist
+
+
+def _envelope_parameters(attack: float = None, decay: float = None, release: float = None) -> List[dict]:
+    """Builds the optional Attack/Decay/Release EventParameters, omitting any
+    that are None (same approach as the Go *float64 / Rust Option<f64> versions)."""
+    params = []
+    if attack is not None:
+        params.append({"ParameterID": ParamID.H_AttackTime.value, "ParameterValue": attack})
+    if decay is not None:
+        params.append({"ParameterID": ParamID.H_DecayTime.value, "ParameterValue": decay})
+    if release is not None:
+        params.append({"ParameterID": ParamID.H_ReleaseTime.value, "ParameterValue": release})
+    return params
+
+
 class AHAP:
     """_Class that allows to make Apple haptic signal files (.ahap)."""
     def __init__(self, description: str = "test AHAP file", created_by: str = "Deniz Sincar"):
@@ -133,7 +160,8 @@ class AHAP:
     def __rshift__(self, args: Tuple):
         self.add_event(*args)
 
-    def add_haptic_transient_event(self, time: float, haptic_intensity: float = 0.5, haptic_sharpness: float = 0.5):
+    def add_haptic_transient_event(self, time: float, haptic_intensity: float = 0.5, haptic_sharpness: float = 0.5,
+                                    attack: float = None, decay: float = None, release: float = None):
         """
         Adds a haptic transient event to the pattern.
 
@@ -143,6 +171,9 @@ class AHAP:
                 Should be a float between 0 and 1.
             haptic_sharpness (float): The sharpness of the haptic event.
                 Should be a float between 0 and 1.
+            attack (float, optional): HapticAttackTime envelope parameter. Omitted if None.
+            decay (float, optional): HapticDecayTime envelope parameter. Omitted if None.
+            release (float, optional): HapticReleaseTime envelope parameter. Omitted if None.
         """
         parameters = [
             {
@@ -154,10 +185,12 @@ class AHAP:
                 "ParameterValue": haptic_sharpness,
             }
         ]
+        parameters.extend(_envelope_parameters(attack, decay, release))
 
         self.add_event(etype="HapticTransient", time=time, parameters=parameters)
 
-    def add_haptic_continuous_event(self, time: float, event_duration: float = 1, haptic_intensity: float = 0.5, haptic_sharpness: float = 0.5):
+    def add_haptic_continuous_event(self, time: float, event_duration: float = 1, haptic_intensity: float = 0.5, haptic_sharpness: float = 0.5,
+                                     attack: float = None, decay: float = None, release: float = None):
         """
         Adds a haptic continuous event to the pattern.
 
@@ -168,6 +201,9 @@ class AHAP:
                 Should be a float between 0 and 1.
             haptic_sharpness (float): The sharpness of the haptic event.
                 Should be a float between 0 and 1.
+            attack (float, optional): HapticAttackTime envelope parameter. Omitted if None.
+            decay (float, optional): HapticDecayTime envelope parameter. Omitted if None.
+            release (float, optional): HapticReleaseTime envelope parameter. Omitted if None.
         """
         parameters = [
             {
@@ -179,6 +215,7 @@ class AHAP:
                 "ParameterValue": haptic_sharpness,
             }
         ]
+        parameters.extend(_envelope_parameters(attack, decay, release))
 
         self.add_event(etype="HapticContinuous", time=time, parameters=parameters, event_duration=event_duration)
 
@@ -243,7 +280,7 @@ class AHAP:
     def __call__(self, *args: Any, **kwds: Any) -> Any:
         self.export(*args, **kwds)
 
-    def __add__(self, other: AHAP):
+    def __add__(self, other: "AHAP"):
         """adds 2 ahap files. Attension, it smooshes them one on another, it doesn't work as expected now. Please don't use this method if you don't want to really smoosh them.
 
         Args:

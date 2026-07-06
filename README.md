@@ -16,12 +16,23 @@ AHAP files are JSON-formatted special Apple Haptic pattern files. They are commo
 - ahap.py: Module for creating AHAP (Apple Haptic) files.
 - makeahap.py: A file that creates a motorcycle sound with vibrations.
 - music.py: An attempt to create musical notes via haptics, but failed.
+- midi2ahap.py: Converts a MIDI file to an AHAP pattern. Channel-10 (GM drum
+  channel) notes get instrument-appropriate haptic shapes - kicks/toms are a
+  short felt punch, cymbals/open hi-hat get a long ringing tail with a
+  decaying intensity curve, snares/sticks stay a crisp instantaneous hit -
+  instead of one flat transient for every drum hit. Melodic notes on other
+  channels map pitch to sharpness. Requires `mido` (see Requirements).
 
 ## Requirements
 
 My script will run on Python 3.6+ and doesn't require any additional modules. However, if you want to run music.py, you can install the librosa module by running the following command:
 ```bash
 pip install librosa
+```
+
+midi2ahap.py needs `mido` for MIDI parsing:
+```bash
+pip install -r requirements.txt
 ```
 
 ## How to Use
@@ -43,6 +54,11 @@ ahap.export(filename="example.ahap")
 ```
 
 You can run the makeahap.py file to generate a sample AHAP file with a truly great motorcycle sound!
+
+To convert a MIDI file:
+```bash
+python3 midi2ahap.py song.mid song.ahap
+```
 
 ## Examples
 

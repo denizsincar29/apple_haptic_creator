@@ -1,5 +1,5 @@
 import unittest
-from ahap import freq
+from ahap import freq, AHAP, create_curve, create_ease_in_out_curve
 
 class TestFreq(unittest.TestCase):
     #def setUp(self) -> None:
@@ -15,6 +15,63 @@ class TestFreq(unittest.TestCase):
         with self.assertRaises(ValueError):
             freq(79, False)
             freq(231, False)
+
+
+class TestEnvelope(unittest.TestCase):
+    def test_transient_omits_none_envelope_fields(self):
+        a = AHAP("t", "t")
+        a.add_haptic_transient_event(0.0, 1.0, 0.5)
+        params = a.data["Pattern"][0]["Event"]["EventParameters"]
+        self.assertEqual(len(params), 2)
+
+    def test_transient_includes_set_envelope_fields_only(self):
+        a = AHAP("t", "t")
+        a.add_haptic_transient_event(0.0, 1.0, 0.5, attack=0.01, decay=0.02)
+        params = a.data["Pattern"][0]["Event"]["EventParameters"]
+        ids = [p["ParameterID"] for p in params]
+        self.assertIn("HapticAttackTime", ids)
+        self.assertIn("HapticDecayTime", ids)
+        self.assertNotIn("HapticReleaseTime", ids)
+
+    def test_continuous_has_duration(self):
+        a = AHAP("t", "t")
+        a.add_haptic_continuous_event(1.0, 2.0, 0.7, 0.6)
+        event = a.data["Pattern"][0]["Event"]
+        self.assertEqual(event["EventDuration"], 2.0)
+
+
+class TestCurves(unittest.TestCase):
+    def test_linear_curve_endpoints(self):
+        points = create_curve(0.0, 1.0, 0.0, 1.0, total=10)
+        self.assertEqual(len(points), 10)
+        self.assertAlmostEqual(points[0].time, 0.1)
+        self.assertAlmostEqual(points[-1].time, 1.0)
+        self.assertAlmostEqual(points[-1].parameter_value, 1.0)
+
+    def test_ease_in_out_matches_linear_at_endpoints(self):
+        points = create_ease_in_out_curve(0.0, 0.6, 1.0, 0.0, total=6)
+        self.assertEqual(len(points), 6)
+        self.assertAlmostEqual(points[-1].time, 0.6)
+        self.assertAlmostEqual(points[-1].parameter_value, 0.0, places=9)
+        # smoothstep midpoint should be exactly 0.5 for a symmetric ramp
+        self.assertAlmostEqual(points[2].parameter_value, 0.5)
+
+
+class TestMidi2Ahap(unittest.TestCase):
+    def test_drum_kinds_produce_expected_shapes(self):
+        from midi2ahap import add_drum_hit, DRUM_MAPPINGS, HapticKind
+
+        a = AHAP("t", "t")
+        add_drum_hit(a, 0.0, DRUM_MAPPINGS[36], 1.0)   # kick -> THUMP
+        add_drum_hit(a, 0.25, DRUM_MAPPINGS[38], 0.9)  # snare -> TRANSIENT
+        add_drum_hit(a, 0.5, DRUM_MAPPINGS[49], 0.9)   # crash -> RINGING
+
+        kinds = [p["Event"]["EventType"] for p in a.data["Pattern"] if "Event" in p]
+        self.assertEqual(kinds, ["HapticContinuous", "HapticTransient", "HapticContinuous"])
+
+        curves = [p for p in a.data["Pattern"] if "ParameterCurve" in p]
+        self.assertEqual(len(curves), 1, "only the ringing (crash) hit should add a decay curve")
+        self.assertEqual(curves[0]["ParameterCurve"]["ParameterID"], "HapticIntensityControl")
 
 if __name__=="__main__":
     unittest.main()
