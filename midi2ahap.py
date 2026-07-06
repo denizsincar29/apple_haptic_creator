@@ -95,6 +95,22 @@ def midi_note_to_freq(note: int) -> float:
     return 440.0 * 2 ** ((note - 69) / 12.0)
 
 
+def notes_for_low_pitch(note: int, floor_hz: float = 80.0) -> list:
+    """The Taptic Engine's continuous events only track frequency down to
+    ~80 Hz; below that a single tone doesn't read as a pitch anymore. So
+    for low notes, shift up by octaves until the root clears the floor,
+    then add a fifth above it as a second simultaneous note - e.g. C2
+    becomes C3+G3. Two notes a fifth apart perceptually still reads as
+    "that low note" much better than one out-of-range tone.
+    """
+    root = note
+    while midi_note_to_freq(root) < floor_hz:
+        root += 12
+    if root == note:
+        return [note]
+    return [root, root + 7]
+
+
 def add_drum_hit(ahap: AHAP, t: float, mapping: DrumMapping, intensity: float) -> None:
     """Renders one drum hit according to its instrument kind - the core of
     "realistic" drums: kicks/toms get a short felt punch (Continuous + decay
@@ -169,11 +185,12 @@ def convert(input_path: str, output_path: str, use_drums: bool = True, indent: O
                         start_time, velocity = start
                         duration = current_time - start_time
                         if duration > 0:
-                            try:
-                                sharpness = freq_to_sharpness(midi_note_to_freq(msg.note))
-                            except ValueError:
-                                sharpness = 0.5
-                            ahap.add_haptic_continuous_event(start_time, duration, velocity / 127.0, sharpness)
+                            for haptic_note in notes_for_low_pitch(msg.note):
+                                try:
+                                    sharpness = freq_to_sharpness(midi_note_to_freq(haptic_note))
+                                except ValueError:
+                                    sharpness = 0.5
+                                ahap.add_haptic_continuous_event(start_time, duration, velocity / 127.0, sharpness)
                             melodic_count += 1
 
     ahap.export(output_path, path=".", indent=indent)

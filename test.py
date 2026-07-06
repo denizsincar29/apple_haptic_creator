@@ -58,6 +58,12 @@ class TestCurves(unittest.TestCase):
 
 
 class TestMidi2Ahap(unittest.TestCase):
+    def test_low_note_splits_into_root_and_fifth(self):
+        from midi2ahap import notes_for_low_pitch
+
+        self.assertEqual(notes_for_low_pitch(36), [48, 55])  # C2 -> C3+G3
+        self.assertEqual(notes_for_low_pitch(60), [60])       # C4 stays single
+
     def test_drum_kinds_produce_expected_shapes(self):
         from midi2ahap import add_drum_hit, DRUM_MAPPINGS, HapticKind
 
