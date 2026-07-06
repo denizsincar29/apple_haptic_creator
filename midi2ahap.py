@@ -99,8 +99,8 @@ def notes_for_low_pitch(note: int, floor_hz: float = 80.0) -> list:
     """The Taptic Engine's continuous events only track frequency down to
     ~80 Hz; below that a single tone doesn't read as a pitch anymore. So
     for low notes, shift up by octaves until the root clears the floor,
-    then add a fifth above it as a second simultaneous note - e.g. C2
-    becomes C3+G3. Two notes a fifth apart perceptually still reads as
+    then add a fourth below it as a second simultaneous note - e.g. C2
+    becomes C3+G2. Two notes a fourth apart perceptually still reads as
     "that low note" much better than one out-of-range tone.
     """
     root = note
@@ -108,7 +108,7 @@ def notes_for_low_pitch(note: int, floor_hz: float = 80.0) -> list:
         root += 12
     if root == note:
         return [note]
-    return [root, root + 7]
+    return [root, root - 5]
 
 
 def add_drum_hit(ahap: AHAP, t: float, mapping: DrumMapping, intensity: float) -> None:
