@@ -111,22 +111,78 @@ def notes_for_low_pitch(note: int, floor_hz: float = 80.0) -> list:
     return [root, root - 5]
 
 
-def add_drum_hit(ahap: AHAP, t: float, mapping: DrumMapping, intensity: float) -> None:
+# Standard General MIDI 2 "Sound Controller" CC numbers, not invented ones -
+# any DAW can already draw automation for these.
+CC_RELEASE_TIME = 72
+CC_ATTACK_TIME = 73
+CC_BRIGHTNESS = 74
+CC_DECAY_TIME = 75
+
+MAX_ENVELOPE_SECONDS = 1.0    # CC value 127 -> this many seconds (0 -> 0.0s)
+MAX_BRIGHTNESS_OFFSET = 0.3   # CC value 0/127 -> +/- this much sharpness (64 = no offset)
+
+
+@dataclass
+class GlobalControl:
+    """Live-updatable global envelope/brightness state, driven by CC 73/72/75
+    (Attack/Release/Decay Time) and CC 74 (Brightness) messages found in the
+    MIDI file itself. `None` means "no override seen yet, keep using each
+    drum kind's own computed default"; once a CC is seen it overrides that
+    field for every event from then on, across every track (this is
+    *global*, not per-channel), until a new value arrives.
+
+    Caveat: tracks are processed one after another, not interleaved in true
+    chronological order, so a CC on one track only reliably affects events
+    on tracks processed *after* it. Put control CCs in track 0 (or a
+    dedicated first track) of a Type-1 file, or use a Type-0 file, to avoid
+    ordering surprises.
+    """
+    attack: Optional[float] = None
+    decay: Optional[float] = None
+    release: Optional[float] = None
+    brightness_offset: float = 0.0
+
+    def apply_cc(self, controller: int, value: int) -> bool:
+        """Updates state from one CC message. Returns True if it was one of ours."""
+        if controller == CC_ATTACK_TIME:
+            self.attack = value / 127.0 * MAX_ENVELOPE_SECONDS
+        elif controller == CC_RELEASE_TIME:
+            self.release = value / 127.0 * MAX_ENVELOPE_SECONDS
+        elif controller == CC_DECAY_TIME:
+            self.decay = value / 127.0 * MAX_ENVELOPE_SECONDS
+        elif controller == CC_BRIGHTNESS:
+            self.brightness_offset = (value - 64) / 63.0 * MAX_BRIGHTNESS_OFFSET
+        else:
+            return False
+        return True
+
+    def adjust_sharpness(self, sharpness: float) -> float:
+        return min(1.0, max(0.0, sharpness + self.brightness_offset))
+
+
+def add_drum_hit(ahap: AHAP, t: float, mapping: DrumMapping, intensity: float, control: "GlobalControl") -> None:
     """Renders one drum hit according to its instrument kind - the core of
     "realistic" drums: kicks/toms get a short felt punch (Continuous + decay
     envelope), cymbals/open hi-hat/etc get a long Continuous event with a
     fading intensity curve, and only snares/sticks/etc stay a flat
-    instantaneous Transient."""
+    instantaneous Transient. `control`'s attack/decay/release/brightness, if
+    set via CC, override the per-kind computed defaults below."""
+    sharpness = control.adjust_sharpness(mapping.sharpness)
+
     if mapping.kind is HapticKind.THUMP:
-        decay = mapping.duration * 0.6
-        release = mapping.duration * 0.4
+        attack = control.attack if control.attack is not None else 0.0
+        decay = control.decay if control.decay is not None else mapping.duration * 0.6
+        release = control.release if control.release is not None else mapping.duration * 0.4
         ahap.add_haptic_continuous_event(
-            t, mapping.duration, intensity, mapping.sharpness,
-            attack=0.0, decay=decay, release=release,
+            t, mapping.duration, intensity, sharpness,
+            attack=attack, decay=decay, release=release,
         )
 
     elif mapping.kind is HapticKind.RINGING:
-        ahap.add_haptic_continuous_event(t, mapping.duration, intensity, mapping.sharpness)
+        ahap.add_haptic_continuous_event(
+            t, mapping.duration, intensity, sharpness,
+            attack=control.attack, release=control.release,
+        )
         # HapticIntensityControl multiplies the event's base HapticIntensity
         # (output = intensity * curve), so this ramps 1.0 -> 0.0, not
         # intensity -> 0. Anchored at relative time 0 so the ring starts at
@@ -138,7 +194,10 @@ def add_drum_hit(ahap: AHAP, t: float, mapping: DrumMapping, intensity: float) -
         ahap.add_parameter_curve(CurveParamID.H_Intensity, t, [anchor] + ramp)
 
     else:  # HapticKind.TRANSIENT
-        ahap.add_haptic_transient_event(t, intensity, mapping.sharpness)
+        ahap.add_haptic_transient_event(
+            t, intensity, sharpness,
+            attack=control.attack, release=control.release,
+        )
 
 
 def convert(
@@ -167,6 +226,9 @@ def convert(
     unknown_drum_count = 0
     melodic_count = 0
     channel_counts: Dict[int, int] = {}
+    # Shared across every track on purpose - see GlobalControl's docstring
+    # for the chronological-ordering caveat that comes with that.
+    control = GlobalControl()
 
     for track in mid.tracks:
         current_time = 0.0
@@ -188,6 +250,9 @@ def convert(
             if msg.type == "set_tempo":
                 _set_current_tempo(track, msg.tempo)
 
+            if msg.type == "control_change":
+                control.apply_cc(msg.control, msg.value)
+
             if msg.type == "note_on" and msg.velocity > 0:
                 is_drum_channel = msg.channel == DRUM_CHANNEL
                 channel_counts[msg.channel] = channel_counts.get(msg.channel, 0) + 1
@@ -198,10 +263,13 @@ def convert(
                     velocity_scale = msg.velocity / 127.0
                     mapping = DRUM_MAPPINGS.get(msg.note)
                     if mapping is not None:
-                        add_drum_hit(ahap, current_time, mapping, mapping.intensity * velocity_scale)
+                        add_drum_hit(ahap, current_time, mapping, mapping.intensity * velocity_scale, control)
                         drum_count += 1
                     else:
-                        ahap.add_haptic_transient_event(current_time, velocity_scale, 0.7)
+                        ahap.add_haptic_transient_event(
+                            current_time, velocity_scale, control.adjust_sharpness(0.7),
+                            attack=control.attack, release=control.release,
+                        )
                         drum_count += 1
                         unknown_drum_count += 1
                 else:
@@ -223,7 +291,11 @@ def convert(
                                     sharpness = freq_to_sharpness(midi_note_to_freq(haptic_note))
                                 except ValueError:
                                     sharpness = 0.5
-                                ahap.add_haptic_continuous_event(start_time, duration, velocity / 127.0, sharpness)
+                                sharpness = control.adjust_sharpness(sharpness)
+                                ahap.add_haptic_continuous_event(
+                                    start_time, duration, velocity / 127.0, sharpness,
+                                    attack=control.attack, decay=control.decay, release=control.release,
+                                )
                             melodic_count += 1
 
     if debug_channels:

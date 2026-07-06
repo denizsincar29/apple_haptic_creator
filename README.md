@@ -21,7 +21,16 @@ AHAP files are JSON-formatted special Apple Haptic pattern files. They are commo
   short felt punch, cymbals/open hi-hat get a long ringing tail with a
   decaying intensity curve, snares/sticks stay a crisp instantaneous hit -
   instead of one flat transient for every drum hit. Melodic notes on other
-  channels map pitch to sharpness. Requires `mido` (see Requirements).
+  channels map pitch to sharpness. `--no-drums` drops channel 10 entirely;
+  `--drums-as-melody` treats it as regular melodic notes instead;
+  `--debug-channels` prints a note-on count per channel. Attack/decay/release
+  and sharpness can also be steered from inside the MIDI file itself using
+  the standard General MIDI 2 Sound Controller CCs: CC 73 (Attack Time), CC
+  72 (Release Time), CC 75 (Decay Time), CC 74 (Brightness -> sharpness
+  offset) - real GM2 CCs, so any DAW can already draw automation for them.
+  Values are global (apply to every event converted afterward, on every
+  channel/track) and mapped 0-127 -> 0.0-1.0 seconds (72/73/75) or +/-0.3
+  sharpness offset (74). Requires `mido` (see Requirements).
 
 ## Requirements
 
