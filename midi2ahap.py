@@ -112,14 +112,25 @@ def notes_for_low_pitch(note: int, floor_hz: float = 80.0) -> list:
 
 
 # Standard General MIDI 2 "Sound Controller" CC numbers, not invented ones -
-# any DAW can already draw automation for these.
+# any DAW can already draw automation for these. CC 72/73/75 are *relative*:
+# a CC value maps to a fraction (0.0-1.0) of each event's own duration, not
+# an absolute number of seconds, so a CC of 100 never smears a 0.15s note
+# into a longer hum than the note itself. This was the original bug here:
+# a fixed ~0.79s release from CC72=100 completely swallowed short note
+# durations (0.15-0.36s is typical), smearing distinct hits into one
+# continuous hum.
 CC_RELEASE_TIME = 72
 CC_ATTACK_TIME = 73
 CC_BRIGHTNESS = 74
 CC_DECAY_TIME = 75
 
-MAX_ENVELOPE_SECONDS = 1.0    # CC value 127 -> this many seconds (0 -> 0.0s)
 MAX_BRIGHTNESS_OFFSET = 0.3   # CC value 0/127 -> +/- this much sharpness (64 = no offset)
+
+# Reference duration used to resolve attack/decay/release fractions for
+# events that have no duration of their own (a HapticTransient is
+# instantaneous). Keeps CC-driven envelope shaping meaningful even there,
+# without ever reintroducing an absolute multi-hundred-ms smear.
+TRANSIENT_REFERENCE_SECONDS = 0.1
 
 
 @dataclass
@@ -131,25 +142,33 @@ class GlobalControl:
     field for every event from then on, across every track (this is
     *global*, not per-channel), until a new value arrives.
 
+    Attack/decay/release are stored as **fractions of each event's own
+    duration** (0.0-1.0), not absolute seconds. A CC of 127 means "this
+    whole event is envelope", a CC of 100 means ~0.79 of the event's
+    duration, etc - the same relative scheme `add_drum_hit`'s THUMP case
+    always used (`mapping.duration * 0.6/0.4`). Resolving to seconds
+    happens at the point of use, via `attack_for`/`decay_for`/`release_for`,
+    once the actual event duration is known.
+
     Caveat: tracks are processed one after another, not interleaved in true
     chronological order, so a CC on one track only reliably affects events
     on tracks processed *after* it. Put control CCs in track 0 (or a
     dedicated first track) of a Type-1 file, or use a Type-0 file, to avoid
     ordering surprises.
     """
-    attack: Optional[float] = None
-    decay: Optional[float] = None
-    release: Optional[float] = None
+    attack: Optional[float] = None  # fraction 0.0-1.0
+    decay: Optional[float] = None   # fraction 0.0-1.0
+    release: Optional[float] = None # fraction 0.0-1.0
     brightness_offset: float = 0.0
 
     def apply_cc(self, controller: int, value: int) -> bool:
         """Updates state from one CC message. Returns True if it was one of ours."""
         if controller == CC_ATTACK_TIME:
-            self.attack = value / 127.0 * MAX_ENVELOPE_SECONDS
+            self.attack = value / 127.0
         elif controller == CC_RELEASE_TIME:
-            self.release = value / 127.0 * MAX_ENVELOPE_SECONDS
+            self.release = value / 127.0
         elif controller == CC_DECAY_TIME:
-            self.decay = value / 127.0 * MAX_ENVELOPE_SECONDS
+            self.decay = value / 127.0
         elif controller == CC_BRIGHTNESS:
             self.brightness_offset = (value - 64) / 63.0 * MAX_BRIGHTNESS_OFFSET
         else:
@@ -158,6 +177,18 @@ class GlobalControl:
 
     def adjust_sharpness(self, sharpness: float) -> float:
         return min(1.0, max(0.0, sharpness + self.brightness_offset))
+
+    def attack_for(self, duration: float) -> Optional[float]:
+        """Resolves the attack-time CC override to seconds, relative to `duration`."""
+        return None if self.attack is None else self.attack * duration
+
+    def decay_for(self, duration: float) -> Optional[float]:
+        """Resolves the decay-time CC override to seconds, relative to `duration`."""
+        return None if self.decay is None else self.decay * duration
+
+    def release_for(self, duration: float) -> Optional[float]:
+        """Resolves the release-time CC override to seconds, relative to `duration`."""
+        return None if self.release is None else self.release * duration
 
 
 def add_drum_hit(ahap: AHAP, t: float, mapping: DrumMapping, intensity: float, control: "GlobalControl") -> None:
@@ -170,9 +201,12 @@ def add_drum_hit(ahap: AHAP, t: float, mapping: DrumMapping, intensity: float, c
     sharpness = control.adjust_sharpness(mapping.sharpness)
 
     if mapping.kind is HapticKind.THUMP:
-        attack = control.attack if control.attack is not None else 0.0
-        decay = control.decay if control.decay is not None else mapping.duration * 0.6
-        release = control.release if control.release is not None else mapping.duration * 0.4
+        attack = control.attack_for(mapping.duration)
+        attack = attack if attack is not None else 0.0
+        decay = control.decay_for(mapping.duration)
+        decay = decay if decay is not None else mapping.duration * 0.6
+        release = control.release_for(mapping.duration)
+        release = release if release is not None else mapping.duration * 0.4
         ahap.add_haptic_continuous_event(
             t, mapping.duration, intensity, sharpness,
             attack=attack, decay=decay, release=release,
@@ -181,7 +215,7 @@ def add_drum_hit(ahap: AHAP, t: float, mapping: DrumMapping, intensity: float, c
     elif mapping.kind is HapticKind.RINGING:
         ahap.add_haptic_continuous_event(
             t, mapping.duration, intensity, sharpness,
-            attack=control.attack, release=control.release,
+            attack=control.attack_for(mapping.duration), release=control.release_for(mapping.duration),
         )
         # HapticIntensityControl multiplies the event's base HapticIntensity
         # (output = intensity * curve), so this ramps 1.0 -> 0.0, not
@@ -196,7 +230,8 @@ def add_drum_hit(ahap: AHAP, t: float, mapping: DrumMapping, intensity: float, c
     else:  # HapticKind.TRANSIENT
         ahap.add_haptic_transient_event(
             t, intensity, sharpness,
-            attack=control.attack, release=control.release,
+            attack=control.attack_for(TRANSIENT_REFERENCE_SECONDS),
+            release=control.release_for(TRANSIENT_REFERENCE_SECONDS),
         )
 
 
@@ -268,7 +303,8 @@ def convert(
                     else:
                         ahap.add_haptic_transient_event(
                             current_time, velocity_scale, control.adjust_sharpness(0.7),
-                            attack=control.attack, release=control.release,
+                            attack=control.attack_for(TRANSIENT_REFERENCE_SECONDS),
+                            release=control.release_for(TRANSIENT_REFERENCE_SECONDS),
                         )
                         drum_count += 1
                         unknown_drum_count += 1
@@ -294,7 +330,8 @@ def convert(
                                 sharpness = control.adjust_sharpness(sharpness)
                                 ahap.add_haptic_continuous_event(
                                     start_time, duration, velocity / 127.0, sharpness,
-                                    attack=control.attack, decay=control.decay, release=control.release,
+                                    attack=control.attack_for(duration), decay=control.decay_for(duration),
+                                    release=control.release_for(duration),
                                 )
                             melodic_count += 1
 

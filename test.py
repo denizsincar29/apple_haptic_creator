@@ -58,7 +58,7 @@ class TestCurves(unittest.TestCase):
 
 
 class TestGlobalControl(unittest.TestCase):
-    def test_cc_values_map_to_seconds_and_offset(self):
+    def test_cc_values_map_to_fractions_and_offset(self):
         from midi2ahap import GlobalControl
 
         control = GlobalControl()
@@ -84,6 +84,26 @@ class TestGlobalControl(unittest.TestCase):
         self.assertIsNone(control.decay)
         self.assertIsNone(control.release)
         self.assertEqual(control.adjust_sharpness(0.42), 0.42)
+
+    def test_cc_release_never_exceeds_short_note_duration(self):
+        # This is the exact bug scenario: CC72=100 arriving once at tick 0,
+        # then short drum/melodic notes (0.15-0.36s) later in the file.
+        from midi2ahap import GlobalControl
+
+        control = GlobalControl()
+        control.apply_cc(72, 100)
+
+        short_note_duration = 0.15
+        release = control.release_for(short_note_duration)
+        self.assertLessEqual(release, short_note_duration)
+        self.assertAlmostEqual(release, short_note_duration * (100.0 / 127.0))
+
+        # A longer note gets a proportionally longer release, not the same
+        # fixed absolute time as the short note.
+        long_note_duration = 1.2
+        long_release = control.release_for(long_note_duration)
+        self.assertAlmostEqual(long_release, long_note_duration * (100.0 / 127.0))
+        self.assertGreater(long_release, release)
 
 
 class TestMidi2Ahap(unittest.TestCase):

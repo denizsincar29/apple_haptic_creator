@@ -29,8 +29,11 @@ AHAP files are JSON-formatted special Apple Haptic pattern files. They are commo
   72 (Release Time), CC 75 (Decay Time), CC 74 (Brightness -> sharpness
   offset) - real GM2 CCs, so any DAW can already draw automation for them.
   Values are global (apply to every event converted afterward, on every
-  channel/track) and mapped 0-127 -> 0.0-1.0 seconds (72/73/75) or +/-0.3
-  sharpness offset (74). Requires `mido` (see Requirements).
+  channel/track) and are *relative*: CC 72/73/75 map 0-127 to a fraction
+  (0.0-1.0) of each event's own duration, not an absolute number of
+  seconds, so a large release never smears a short note into a longer hum
+  than the note itself. Brightness (CC74) maps 0-127 -> +/-0.3 sharpness
+  offset linearly. Requires `mido` (see Requirements).
 
 ## Requirements
 
